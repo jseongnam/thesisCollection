@@ -50,9 +50,9 @@ class deep_atari:
 		print( 'Initializing Module...')
 		self.params = params
 
-		self.gpu_config = tf.ConfigProto(gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=self.params['gpu_fraction']))
+		self.gpu_config = tf.compat.v1.ConfigProto(gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=self.params['gpu_fraction']))
 
-		self.sess = tf.Session(config=self.gpu_config)
+		self.sess = tf.compat.v1.Session(config=self.gpu_config)
 		self.DB = database(self.params)
 		self.engine = emulator(rom_name='breakout.bin', vis=self.params['visualize'],windowname=self.params['network_type']+'_preview')
 		self.params['num_act'] = len(self.engine.legal_actions)
