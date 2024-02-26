@@ -14,9 +14,17 @@ import numpy as np
 import torch
 class Q_learning:
     def __init__(self,ODim, ADim):
-        self.QValue = torch.zeros(ODim,ADim) # state.dim x action.dim
-        self.reward = torch.zeros(ODim,ADim) # state.dim x action.dim - 1번만 설정
+        self.QValue = torch.zeros(ODim,ADim)
+        self.reward = torch.zeros(ODim,ADim)
         self.rate = 0.9
+    
+        self.model = torch.nn.Sequential(
+            torch.nn.Linear(ODim*ADim,128),
+            torch.nn.ReLU(),
+            torch.nn.Linear(128,ODim*ADim)
+        )
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        self.loss_fn = torch.nn.MSELoss()
     def stepSize(self,time):
         self.alpha = 1/time # stepsize(alpha) function = 1/t -> Robbins-Monro 조건 만족
     def getReward(self, action,state,reward):
@@ -27,14 +35,21 @@ class Q_learning:
             if answer < self.QValue[state][i]:
                 answer = self.QValue[state][i]
         return answer        
-    def train(self,actionB,stateB,stateA) :
+        
+    def Qtrain(self,actionB,stateB,stateA) :
         self.QValue[stateB][actionB] = (1-self.alpha) * self.QValue[stateB][actionB] + self.alpha*(self.reward[stateB][actionB] + self.rate*self.maxQ(stateA))
-    
+        
+    def train(self):
+        predicted = self.model(self.QValue.squeeze().view(1,-1)).view(16,4) 
+        loss = self.loss_fn(predicted, self.QValue)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        self.QValue = predicted.detach()
 # env.step : 0,1,2,3 -> 상,하,좌,우
 def main():
     env = gym.make("FrozenLake-v0", is_slippery=False)
-    # print(env.observation_space.n)
-    # print(env.action_space.n)
+
     qLearning = Q_learning(env.observation_space.n,env.action_space.n)
     for i in range(300):
         env.reset()
@@ -44,7 +59,6 @@ def main():
             action = env.action_space.sample()
             stateAfter, reward, done, _ = env.step(action)
             env.render()
-            # print(f"state:{state},reward:{reward},done:{done},R:{R}")
             if reward == 0 and done == True:
                 qLearning.getReward(action,stateBefore,-1)
                 break
@@ -62,9 +76,8 @@ def main():
             qLearning.stepSize(time)
             action = env.action_space.sample()
             stateAfter, reward, done, _ = env.step(action)
-            qLearning.train(action,stateBefore, stateAfter)
+            qLearning.Qtrain(action,stateBefore, stateAfter)
             env.render()
-            # print(f"state:{state},reward:{reward},done:{done},R:{R}")
             if reward == 0 and done == True:
                 time += 1 
                 break
@@ -73,6 +86,7 @@ def main():
                 time += 1 
                 break
             stateBefore = stateAfter
+        qLearning.train()
     print(f"Q : {qLearning.QValue}")
     
 
