@@ -4,10 +4,7 @@
 # Q_α_{t+1}(s, a; ω) = (1 - α_t) * Q_α_t(s, a; ω) + α_t * (r(s, a) + γ * max_{a′∈A} Q_α_t(S′_t(ω), a′; ω))
 # Otherwise:
 # Q_α_{t+1}(s, a; ω) = Q_α_t(s, a; ω)
-
-import gym
-import numpy as np
-import torch
+  
 
 import gym
 import numpy as np
@@ -35,7 +32,14 @@ class Q_learning:
             if answer < self.QValue[state][i]:
                 answer = self.QValue[state][i]
         return answer        
-        
+    def maxAction(self,state):
+        answer = -21e8
+        idx = -1
+        for i in range(4):
+            if answer < self.QValue[state][i]:
+                answer = self.QValue[state][i]
+                idx = i
+        return idx        
     def Qtrain(self,actionB,stateB,stateA) :
         self.QValue[stateB][actionB] = (1-self.alpha) * self.QValue[stateB][actionB] + self.alpha*(self.reward[stateB][actionB] + self.rate*self.maxQ(stateA))
         
@@ -47,18 +51,36 @@ class Q_learning:
         self.optimizer.step()
         self.QValue = predicted.detach()
 # env.step : 0,1,2,3 -> 상,하,좌,우
+    def evaluate_policy(self):
+        env = gym.make("FrozenLake-v0", is_slippery=False)
+
+        episodes = 1
+        success = 0
+        for _ in range(episodes):
+            env.reset()
+            state = 0
+            while 1 :
+                action = self.maxAction(state)
+                state, reward, done, _ = env.step(action)
+                # env.render()
+                if reward == 0 and done == True:
+                    break
+                elif reward == 1 :
+                    success += 1
+                    break
+        accuracy = success / episodes
+        return accuracy
 def main():
     env = gym.make("FrozenLake-v0", is_slippery=False)
 
     qLearning = Q_learning(env.observation_space.n,env.action_space.n)
     for i in range(300):
         env.reset()
-        print(i)
         stateBefore = 0
         while 1:
             action = env.action_space.sample()
             stateAfter, reward, done, _ = env.step(action)
-            env.render()
+            # env.render()
             if reward == 0 and done == True:
                 qLearning.getReward(action,stateBefore,-1)
                 break
@@ -67,17 +89,16 @@ def main():
                 break
             stateBefore = stateAfter
     time = 1
-    while time < 3000:
+    while time < 300000:
         env.reset()
 
-        print(i)
         stateBefore = 0
         while 1:
             qLearning.stepSize(time)
             action = env.action_space.sample()
             stateAfter, reward, done, _ = env.step(action)
             qLearning.Qtrain(action,stateBefore, stateAfter)
-            env.render()
+            # env.render()
             if reward == 0 and done == True:
                 time += 1 
                 break
@@ -87,7 +108,13 @@ def main():
                 break
             stateBefore = stateAfter
         qLearning.train()
-    print(f"Q : {qLearning.QValue}")
+
+        if time % 1000 == 0 :
+            success = qLearning.evaluate_policy()
+            print(f"time:{time}, success:{success}")
+    accuracy = qLearning.evaluate_policy()
+    print(f"Accuracy:{accuracy * 100}%")
+    
     
 
 main()
